@@ -3,11 +3,11 @@ from src.core.core_scan import DBBrowserApp
 
 def main():
     app = DBBrowserApp()
-    app.run()
+    with app.ui.console.screen():
+        app.run()
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\nBye!")
         sys.exit(0)
