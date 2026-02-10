@@ -8,14 +8,24 @@ class DBBrowserApp:
 
     def run(self):
         self.ui.show_banner()
+        try:
+            while True:
+                active_dbms = self._discover_step()
+                if not active_dbms:
+                    # Если ничего не найдено — спросим пользователя, продолжать ли проверку
+                    choice = self.ui.select_from_list("No DBMS found. Retry?", ["Yes", "No"])
+                    if choice == "Yes":
+                        continue
+                    break
 
-        active_dbms = self._discover_step()
-        if not active_dbms: return
+                dbms_type = self.ui.select_from_list("Choose DBM:", active_dbms)
+                credentials = self._login_step(dbms_type)
 
-        dbms_type = self.ui.select_from_list("Choose DBM:", active_dbms)
-        credentials = self._login_step(dbms_type)
+                self._explore_databases(dbms_type, credentials)
 
-        self._explore_databases(dbms_type, credentials)
+
+        except KeyboardInterrupt:
+            return
 
     def _discover_step(self):
         with self.ui.show_status("Scanning"):
@@ -50,11 +60,11 @@ class DBBrowserApp:
                 tables = DBManager.get_tables_list(new_url)
 
             if not tables:
-                self.ui.console.print(f"\n[yellow]! No tables in {selected_db}.[/yellow]")
+                self.ui.console.print(f"\n[yellow]⚠ No tables found in {selected_db}[/yellow]")
             else:
                 self.ui.show_table(
-                    title=f"Tablse: {selected_db}",
-                    columns=["Name"],
+                    title=f"Tables in {selected_db}",
+                    columns=["Table Name"],
                     rows=[[t] for t in tables]
                 )
 
@@ -63,7 +73,9 @@ class DBBrowserApp:
 
     def _handle_error(self, e):
         error_msg = str(e)
-        if "authentication failed" in error_msg:
-            self.ui.show_error(f"Wrong pass or pg_hba.conf error:{error_msg}")
+        if "authentication failed" in error_msg.lower():
+            self.ui.show_error(f"Authentication failed. Check credentials or pg_hba.conf")
+        elif "could not connect" in error_msg.lower():
+            self.ui.show_error(f"Could not connect to database. Is the server running?")
         else:
-            self.ui.show_error(f"Ошибка: {error_msg}")
+            self.ui.show_error(f"Error: {error_msg}")
